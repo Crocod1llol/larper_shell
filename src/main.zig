@@ -16,35 +16,27 @@ pub fn main(init: std.process.Init) !void {
     var stdin_buf: [512]u8 = undefined;
     var stdin_file = std.Io.File.reader(std.Io.File.stdin(), init.io, &stdin_buf);
 
+    //print very super polite message
+    try output_file.interface.print("Welcome to larper_shell!\n", .{});
+    try output_file.interface.print("You are free to express your larping here!\n", .{});
+    try output_file.interface.print("Pro tip: there are built-in commands to help express your larp!\n", .{});
+
+    try output_file.interface.flush();
+
     //while
     while (true) {
+
+        try output_file.interface.print("$ ", .{});
+        try output_file.flush();
 
         const result = try stdin_file.interface.takeDelimiter('\n');
 
         //make zig take all the bytes except the unused ones, so we can compare strings
         const trimmed_result = result orelse break;
 
-        //check if its "exit" so we exit
-        //TEMP: will have a special func to execute builtin commands
-        if (std.mem.eql(u8, trimmed_result, "exit")) {
+        if (try commands.exec_buildin(trimmed_result, init) == 255) {
+
             break;
         }
-
-        //TEMP: we just print the text
-        //handle the null case cause zig compiler tells me to
-        if (result) |resultV2| {
-
-            //if its not, then print the normal value
-            try output_file.interface.print("{s}\n", .{resultV2});
-        } else {
-
-            //if it is, then handle it
-            try output_file.interface.print("Error: somehow you tricked the program into not taking even the newline char, good job\n", .{});
-            try output_file.interface.flush();
-            
-            std.process.exit(1);
-        }
-    
-        try output_file.interface.flush();
     }
 }

@@ -2,30 +2,48 @@
 
 const std = @import("std");
 
-///checks if a command is builtin or not, by comparing the string
-pub fn check_builtin(command: []const u8) bool {
+///executes a builtin command's function, or if its short, the command itself
+///return a u8 of the state that the command sent 
+///0 - completed with success, 1 - exited with failure, 255 - it requested to exit
+pub fn exec_buildin(command: []const u8, init: std.process.Init) !u8 {
 
-    //unfortunately we cant use switch, so the good ol 
-    //unefficient if else if snake will be here
+    //make the output file interface for good measures
+    var out_buf: [512]u8 = undefined;
+    var out_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
 
-    if (std.mem.eql(u8, command, "hack")) {
+    //yes, we will have to do the funny if else snake again
+    //fuck this
+    if (std.mem.eql(u8, command, "")) {
 
-        return true;
+        return 0;
     } else if (std.mem.eql(u8, command, "exit")) {
 
-        return true;
+        //req to exit
+        return 255;
+    } else if (std.mem.eql(u8, command, "hack")) {
+
+        //TEMP: it will just print this
+        try out_file.interface.print("hack\n", .{});
+        try out_file.interface.flush();
+
+        return 0;
+    } else if (std.mem.eql(u8, command, "clear")) {
+
+        //insert funny chars to clear the screen
+        try out_file.interface.print("{c}[2J{c}[1;1H", .{27, 27});
+        try out_file.interface.flush();
+
+        return 0;
+
+    } else if (std.mem.eql(u8, command, "cd")) {
+
+        return 0;
     } else {
-        //if nothing matches, then it isnt a builtin command
 
-        return false;
+        std.log.err("Unknown built-in command: {s}", .{command});
+
+        //if nothing is matching, return 1
+        return 1;
     }
-
 }
-
-//executes a builtin command
-//^^^ make doc commment
-
-//pub fn exec_buildin() !void {
-
-//}
 
