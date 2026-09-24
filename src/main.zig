@@ -1,8 +1,4 @@
 const std = @import("std");
-const c = @cImport(
-
-    @cInclude("unistd.h")
-);
 
 //import files
 const commands = @import("commands.zig");
