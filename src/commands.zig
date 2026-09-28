@@ -1,4 +1,4 @@
-///the file that holds built in commands and the func that executes non-built in commands found in the file system
+//!the file that holds built in commands and the func that executes non-built in commands found in the file system
 const std = @import("std");
 
 const main = @import("main.zig");
@@ -19,7 +19,7 @@ pub fn exec_buildin(cmd: command, init: std.process.Init) !u8 {
     var out_buf: [512]u8 = undefined;
     var out_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
 
-    //yes, we will have to do the funny if else snake again
+    //yes, we will have to do the funny if else snake 
     //fuck this
     if (std.mem.eql(u8, cmd.base_command, "")) {
 
@@ -64,11 +64,35 @@ pub fn exec_buildin(cmd: command, init: std.process.Init) !u8 {
 
         return 0;
     } else {
-        //it completed with success ok bro?
-        std.log.info("Command completed succesfully!", .{});
-
+        //if no built-in command was found, instruct to try to execute a binary on disk
+        
         return 2;
     }
+}
+
+///execute the command on system (ex. /usr/bin/which)
+pub fn exec_syscommand(cmd: command, init: std.process.Init) !void {
+    //setup argument array to pass to child
+    const argsv = [_][]const u8{cmd.base_command, cmd.args};
+
+    //also handle arguments cause whitespace as argument messes things up
+    //if (std.mem.eql(u8, cmd.args, "")) {
+        //just reset the entire array
+        //argsv = [_][]const u8{cmd.base_command};
+    //}
+
+    //then spawn the child and let it rip (also inherit the standard output/input/err from parent to child so it writed to stdout directly)
+    //also catch the error and return it so the program doesnt stop cause try ussualy kills a program from a error
+    var child = std.process.spawn(init.io, .{ .argv = &argsv, .stdout = .inherit, .stdin = .inherit, .stderr = .inherit}) catch |err| {
+
+        std.log.err("{}, tried to run: {s}, had arguments: {s}", .{err, cmd.base_command, cmd.args});
+
+        return;
+    };
+
+    //now wait for child to finish
+    const wait = try child.wait(init.io);
+    _ = wait;
 }
 
 ///function to differentiate the base cmd and the args and combine them into a struct
@@ -78,7 +102,7 @@ pub fn parse_command(whole_line: []const u8) command {
     var ret_command: command = .{
 
         .base_command = "",
-        .args = ",",
+        .args = "",
     };
 
     //first get the base command, and then extract the return types
