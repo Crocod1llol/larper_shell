@@ -4,8 +4,7 @@ const std = @import("std");
 const commands = @import("commands.zig");
 
 //da alligator
-var debug_allocator = std.heap.DebugAllocator(.{}){};
-const gpa = debug_allocator.allocator();
+var allocator = std.heap.page_allocator;
 
 //global constants
 const MAX_FILEPATH = 4096;
@@ -18,10 +17,10 @@ pub fn give_cwd(init: std.process.Init, will_print: bool) ![]u8 {
     var output_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
 
     //alloc memory so that it lasts long enough so i can return it
-    const cwd_buf: *[MAX_FILEPATH]u8 = try gpa.create([MAX_FILEPATH]u8);
+    const cwd_buf: *[MAX_FILEPATH]u8 = try allocator.create([MAX_FILEPATH]u8);
 
     //and because of that problem, i will free it later
-    defer gpa.destroy(cwd_buf);
+    defer allocator.destroy(cwd_buf);
 
 
     const status = std.os.linux.getcwd(cwd_buf, MAX_FILEPATH);
@@ -51,7 +50,7 @@ pub fn give_cwd(init: std.process.Init, will_print: bool) ![]u8 {
 
 ///a func that trims in a way so that the first word until the char stays
 ///useful for defining the base command
-///its also very useful to return the i var, so ill make an anonymous struct1
+///its also very useful to return the i var to help with defining args, so ill make an anonymous struct
 pub fn trimArgs(line: []const u8, prefix_char: u8) struct {trimmed_line: []const u8, iterator: usize} {
 
     var i: usize = 0;
@@ -96,9 +95,6 @@ pub fn trimBase_command(line: []const u8, prefix_char: u8, iterator: usize) []co
 
 pub fn main(init: std.process.Init) !void {
 
-    //fun fact: i have to defer something
-    defer std.debug.assert(debug_allocator.deinit() == .ok);
-
     //setup stdout file handler to print
     var out_buf: [512]u8 = undefined;
     var output_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
@@ -131,6 +127,7 @@ pub fn main(init: std.process.Init) !void {
         //check if the given command was a buildin command, else exec external command
         if (try commands.exec_buildin(command_given, init) == 2 ) {
 
+            try commands.exec_syscommand(command_given, init);
         }
 
     }
