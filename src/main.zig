@@ -48,50 +48,6 @@ pub fn give_cwd(init: std.process.Init, will_print: bool) ![]u8 {
     return "";
 }
 
-///a func that trims in a way so that the first word until the char stays
-///useful for defining the base command
-///its also very useful to return the i var to help with defining args, so ill make an anonymous struct
-pub fn trimArgs(line: []const u8, prefix_char: u8) struct {trimmed_line: []const u8, iterator: usize} {
-
-    var i: usize = 0;
-    while (i < line.len) {
-
-        if (line[i] == prefix_char) { 
-            break; 
-        }
-
-        i = i + 1;
-    }
-    
-    //return line[0..i];
-    return .{ .trimmed_line = line[0..i], .iterator = i, };
-}
-
-///a func that trims in a way so that the first work until the char is deleted
-///useful for defining arguments
-///also to take an iterator as an argument will be helpful for making args
-///put 0 as iterator if you dont have any value
-pub fn trimBase_command(line: []const u8, prefix_char: u8, iterator: usize) []const u8 {
-
-    var i: usize = undefined;
-    
-    if (iterator == 0) {
-
-        i = line.len - 1;
-    } else {
-        i = iterator;
-    }
-
-    while (i <= line.len) {
-
-        if (line[i] == prefix_char) {
-            break;
-        }
-        i = i - 1;
-    }
-
-    return line[i+1..line.len];
-}
 
 pub fn main(init: std.process.Init) !void {
 

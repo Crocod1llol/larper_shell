@@ -3,62 +3,61 @@ const std = @import("std");
 
 const main = @import("main.zig");
 
-///struct to bundle the args and the base command togheter
-pub const command = struct {
-
-    base_command: []const u8,
-    args: []const u8,
-};
-
 ///executes a builtin command's function, or if its short, the command itself
 ///returns a u8, 0 means sucess, 1 means failure of a builtin command, 
 ///and 2 will be command not found (and will be using 1 to then check with the system binary command)
-pub fn exec_buildin(cmd: command, init: std.process.Init) !u8 {
+pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
+
+    //firstly check if the command given isnt an empty one so we exit before crashing :D
+    //and because indexing crashes, just compare the string lenght
+    if (cmd.len == 0) {
+        return 0;
+    }
 
     //make the output file interface for good measures
     var out_buf: [512]u8 = undefined;
     var out_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
 
+    //alias
+    const base_command = cmd[0];
+
     //yes, we will have to do the funny if else snake 
     //fuck this
-    if (std.mem.eql(u8, cmd.base_command, "")) {
-
-        return 0;
-    } else if (std.mem.eql(u8, cmd.base_command, "exit")) {
+    if (std.mem.eql(u8, base_command, "exit")) {
 
         std.process.exit(0);
         return 0;
-    } else if (std.mem.eql(u8, cmd.base_command, "hack")) {
+    } else if (std.mem.eql(u8, base_command, "hack")) {
 
         //TEMP: it will just print this
         try out_file.interface.print("hack\n", .{});
         try out_file.interface.flush();
 
         return 0;
-    } else if (std.mem.eql(u8, cmd.base_command, "clear")) {
+    } else if (std.mem.eql(u8, base_command, "clear")) {
 
         //insert funny chars to clear the screen
         try out_file.interface.print("{c}[2J{c}[1;1H", .{27, 27});
         try out_file.interface.flush();
 
         return 0;
-    } else if (std.mem.eql(u8, cmd.base_command, "cd")) {
+    } else if (std.mem.eql(u8, base_command, "cd")) {
         //change dir
-        std.process.setCurrentPath(init.io, cmd.args) catch |err| {
+        std.process.setCurrentPath(init.io, cmd[1]) catch |err| {
 
             //if its a blank space, then ignore the error
-            if (std.mem.eql(u8, cmd.args, "")) {
+            if (std.mem.eql(u8, cmd[1], "")) {
 
                 return 0;
             }
 
-            std.log.err("{}, had arguments: {s}", .{err, cmd.args});
+            std.log.err("{}, had arguments: {s}", .{err, cmd[1]});
 
             return 1;
         };
 
         return 0;
-    } else if (std.mem.eql(u8, cmd.base_command, "pwd")) {
+    } else if (std.mem.eql(u8, base_command, "pwd")) {
 
         _ = try main.give_cwd(init, true); 
 
@@ -71,21 +70,13 @@ pub fn exec_buildin(cmd: command, init: std.process.Init) !u8 {
 }
 
 ///execute the command on system (ex. /usr/bin/which)
-pub fn exec_syscommand(cmd: command, init: std.process.Init) !void {
-    //setup argument array to pass to child
-    const argsv = [_][]const u8{cmd.base_command, cmd.args};
+pub fn exec_syscommand(cmd: [] []const u8, init: std.process.Init) !void {
 
-    //also handle arguments cause whitespace as argument messes things up
-    //if (std.mem.eql(u8, cmd.args, "")) {
-        //just reset the entire array
-        //argsv = [_][]const u8{cmd.base_command};
-    //}
-
-    //then spawn the child and let it rip (also inherit the standard output/input/err from parent to child so it writed to stdout directly)
+    //spawn the child and let it rip (also inherit the standard output/input/err from parent to child so it writed to stdout directly)
     //also catch the error and return it so the program doesnt stop cause try ussualy kills a program from a error
-    var child = std.process.spawn(init.io, .{ .argv = &argsv, .stdout = .inherit, .stdin = .inherit, .stderr = .inherit}) catch |err| {
+    var child = std.process.spawn(init.io, .{ .argv = cmd, .stdout = .inherit, .stdin = .inherit, .stderr = .inherit}) catch |err| {
 
-        std.log.err("{}, tried to run: {s}, had arguments: {s}", .{err, cmd.base_command, cmd.args});
+        std.log.err("{}, tried to run: {s}", .{err, cmd[0]});
 
         return;
     };
@@ -95,32 +86,29 @@ pub fn exec_syscommand(cmd: command, init: std.process.Init) !void {
     _ = wait;
 }
 
-///function to differentiate the base cmd and the args and combine them into a struct
-pub fn parse_command(whole_line: []const u8) command {
+///functio to tokenize a long string into smaller array of strings to be the base command and args
+pub fn parse_command(whole_line: []const u8) [] []const u8 {
 
-    //create a struct that we are gonna return
-    var ret_command: command = .{
+    //the string array we are gonna return
+    var whole_command: [64][]const u8 = undefined;
 
-        .base_command = "",
-        .args = "",
-    };
+    var count: usize = 0;
 
-    //first get the base command, and then extract the return types
-    const trimArgs_return = main.trimArgs(whole_line, ' ');
+    //found out that zig has a func for tokenizing yayyyy
+    //i dont have to build one myself :DDDD
+    var iterator = std.mem.tokenizeScalar(u8, whole_line, ' ');
 
-    ret_command.base_command = trimArgs_return.trimmed_line;
+    //and then go to the next occurance of whitespace and tokenize it
+    while (iterator.next()) |part| {
+        //get out when max lenght reached
+        if (count == whole_line.len) {
+            break;
+        }
 
-    //if the base command is the same as the entire line, then just dont include args and your good
-    if (std.mem.eql(u8, ret_command.base_command, whole_line)) {
-
-        ret_command.args = "";
-        return ret_command;
+        whole_command[count] = part;
+        count += 1;
     }
 
-    //now lemme get the iterator
-    const iter1: usize =  trimArgs_return.iterator;
-
-    ret_command.args = main.trimBase_command(whole_line, ' ', iter1);
-
-    return ret_command;
+    //and just retunr the spots in the array that are used
+    return whole_command[0..count];
 }
