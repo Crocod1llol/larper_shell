@@ -29,9 +29,7 @@ pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
         return 0;
     } else if (std.mem.eql(u8, base_command, "hack")) {
 
-        //TEMP: it will just print this
-        try out_file.interface.print("hack\n", .{});
-        try out_file.interface.flush();
+        try exec_hack(init);
 
         return 0;
     } else if (std.mem.eql(u8, base_command, "clear")) {
@@ -66,6 +64,72 @@ pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
         //if no built-in command was found, instruct to try to execute a binary on disk
         
         return 2;
+    }
+}
+
+///idk man "execute" hacking and by that i mean printing a bunch of text to larp
+fn exec_hack(init: std.process.Init) !void {
+
+    //make the output file interface for good measures
+    var out_buf: [512]u8 = undefined;
+    var out_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
+
+    //stdin, obtain result from the user
+    var stdin_buf: [512]u8 = undefined;
+    var stdin_file = std.Io.File.reader(std.Io.File.stdin(), init.io, &stdin_buf);
+
+    //start
+    try out_file.interface.print("H3llo wh0 do yoU w|sh to H#ck!?\n\n", .{});
+
+    try out_file.interface.print("1 - l0c@l c0mputer\n", .{});
+    try out_file.interface.print("2 - r3mote $erv3r\n", .{});
+    try out_file.interface.print("3 - h@ack by Ip and |nj3ct malw@re\n", .{});
+    try out_file.interface.print("4 - l3ave\n", .{});
+    try out_file.interface.flush();
+
+    //take in user input
+    const result = try stdin_file.interface.takeDelimiter('\n');
+
+    //make zig take all the bytes except the unused ones, so we can compare strings
+    const trimmed_result = result orelse return;
+    
+    if (std.mem.eql(u8, trimmed_result, "1")) {
+
+        try out_file.interface.print("l0ading into l0c@l c0mputer\n", .{});
+        try out_file.interface.print("0bta1ning IP.. \n0bta1ning general information..\n0bta1ning m|sc info.. \n", .{});
+
+        try out_file.interface.flush();
+
+        //ok so the clock is weird
+        //so std.Io.Clock.now(.awake. io) return the time it currently it
+        //and .awake is some sort of stopwatch... i dont really understand
+        try std.Io.sleep(init.io, .fromMilliseconds(2000), .awake);
+
+        try out_file.interface.print("l0cal cOmputer pwn3d. injecting malware\n", .{});
+        try out_file.interface.flush();
+
+        try std.Io.sleep(init.io, .fromMilliseconds(5000), .awake);
+
+        try out_file.interface.print("d0ne.\n", .{});
+        try out_file.interface.flush();
+    } else if (std.mem.eql(u8, trimmed_result, "2")) {
+
+        try out_file.interface.print("l0ading tools to hack r3mote\n", .{});
+        try out_file.interface.flush();
+
+        const target_ip = try stdin_file.interface.takeDelimiter('\n') orelse return;
+
+        try out_file.interface.print("@ttempt|ng pwning ip {s}\n", .{target_ip});
+        try out_file.interface.flush();
+
+        //pwn
+        try std.Io.sleep(init.io, .fromMilliseconds(2500), .awake);
+
+        try out_file.interface.print("r3mote s3rver h@cked, logged in.\n", .{});
+
+    } else {
+        try out_file.interface.print("1nval|d opti0n\n", .{});
+        try out_file.interface.flush();
     }
 }
 
