@@ -115,6 +115,8 @@ fn exec_hack(init: std.process.Init) !void {
     } else if (std.mem.eql(u8, trimmed_result, "2")) {
 
         try out_file.interface.print("l0ading tools to hack r3mote\n", .{});
+
+        try out_file.interface.print("3nter target: ", .{});
         try out_file.interface.flush();
 
         const target_ip = try stdin_file.interface.takeDelimiter('\n') orelse return;
@@ -126,6 +128,29 @@ fn exec_hack(init: std.process.Init) !void {
         try std.Io.sleep(init.io, .fromMilliseconds(2500), .awake);
 
         try out_file.interface.print("r3mote s3rver h@cked, logged in.\n", .{});
+        try out_file.interface.flush();
+    }
+    else if (std.mem.eql(u8, trimmed_result, "3")) {
+
+        try out_file.interface.print("h@ck bY IP, 3nter t@rget:\n", .{});
+        try out_file.interface.flush();
+
+        //usr input
+        const target_ip = try stdin_file.interface.takeDelimiter('\n') orelse return;
+
+        try out_file.interface.print("t@rget: {s}. Attempting...\n", .{target_ip});
+        try out_file.interface.flush();
+
+        //pwn
+        try std.Io.sleep(init.io, .fromMilliseconds(4000), .awake);
+
+        try out_file.interface.print("t@rget: {s}. SUcCed3d. Injecting malware..\n", .{target_ip});
+        try out_file.interface.flush();
+
+        try std.Io.sleep(init.io, .fromMilliseconds(750), .awake);
+
+        try out_file.interface.print("D0ne. t@rget sh0uld b3 w|ped.\n", .{});
+        try out_file.interface.flush();
 
     } else {
         try out_file.interface.print("1nval|d opti0n\n", .{});
