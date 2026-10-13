@@ -32,6 +32,13 @@ pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
         try exec_hack(init);
 
         return 0;
+
+    } else if (std.mem.eql(u8, base_command, "green_text")) {
+
+        try exec_green_text(init);
+
+        return 0;
+    
     } else if (std.mem.eql(u8, base_command, "clear")) {
 
         //insert funny chars to clear the screen
@@ -64,6 +71,37 @@ pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
         //if no built-in command was found, instruct to try to execute a binary on disk
         
         return 2;
+    }
+}
+
+///just goes green text hacker style idk man larp as a hacker if you wish
+fn exec_green_text(init: std.process.Init) !void {
+
+    //make the output file interface for good measures
+    var out_buf: [512]u8 = undefined;
+    var out_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &out_buf);
+
+    //stdin, obtain result from the user
+    var stdin_buf: [512]u8 = undefined;
+    var stdin_file = std.Io.File.reader(std.Io.File.stdin(), init.io, &stdin_buf);
+    
+    try out_file.interface.print("Every 1 million chars you can enter 'exit' or something else to continue\n", .{});
+    try out_file.interface.flush();
+
+    while (true) {
+        const result = try stdin_file.interface.takeDelimiter('\n') orelse return;
+
+        //checks if the user prompted to stop
+        if (std.mem.eql(u8, result, "exit")) {
+            break;
+        }
+
+        for (0..1000000) |i| {
+            _ = i;
+
+            try out_file.interface.print("436921874628374698713269847612987346912873468712683473259784612873649817623987461928734698172634987126984716328974612987436987", .{});
+        }
+        try out_file.interface.flush();
     }
 }
 
