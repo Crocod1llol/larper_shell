@@ -22,7 +22,6 @@ pub fn give_cwd(init: std.process.Init, will_print: bool) ![]u8 {
     //and because of that problem, i will free it later
     defer allocator.destroy(cwd_buf);
 
-
     const status = std.os.linux.getcwd(cwd_buf, MAX_FILEPATH);
 
     //check if it failed
@@ -77,18 +76,19 @@ pub fn main(init: std.process.Init) !void {
         //make zig take all the bytes except the unused ones, so we can compare strings
         const trimmed_result = result orelse break;
 
-        //make vars for 
         var command_given_piped: commands.piped_command = undefined;
         var command_given: [][]const u8 = undefined;
 
+        //check if theres a pipe
         var is_pipe: bool = false;
-        //also check if theres a pipe
         for (0..trimmed_result.len) |i| {
             if (trimmed_result[i] == '|') {
                 is_pipe = true;
+                break;
             }
         }
 
+        //parse commands
         if (is_pipe) {
 
             command_given_piped = commands.parse_piped(trimmed_result);
@@ -97,10 +97,12 @@ pub fn main(init: std.process.Init) !void {
             command_given = commands.parse_command(trimmed_result);
         }
 
+        //execute them
         if (is_pipe) {
-            //TEMP:: WIL HAVE A FUNC TO EXEC PIPED COMMANDS
+            try commands.exec_pipe(command_given_piped, init);
         } else {
             //check if the given command was a buildin command, else exec external command
+            //exec_builtin returns 2 if external command
             if (try commands.exec_buildin(command_given, init) == 2 ) {
 
                 try commands.exec_syscommand(command_given, init);
