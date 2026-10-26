@@ -3,11 +3,14 @@ const std = @import("std");
 
 const main = @import("main.zig");
 
+//alligator
+var allocator = std.heap.page_allocator;
+
 ///a struct to handle piped commands
 pub const piped_command = struct {
 
-    first_command: [][]const u8,
-    second_command: [][]const u8,
+    first_command: []const []const u8,
+    second_command: []const []const u8,
 };
 
 ///executes a builtin command's function, or if its short, the command itself
@@ -34,6 +37,19 @@ pub fn exec_buildin(cmd: [] []const u8, init: std.process.Init) !u8 {
 
         std.process.exit(0);
         return 0;
+    } else if (std.mem.eql(u8, base_command, "help")) {
+
+        try out_file.interface.print("cd -- change dir (cd <dir>)\n", .{});
+        try out_file.interface.print("exit -- exit\n", .{});
+        try out_file.interface.print("hack -- hacks (fr fr no fake)\n", .{});
+        try out_file.interface.print("green_text -- green_text omg hack\n", .{});
+        try out_file.interface.print("clear -- clears the output\n", .{});
+        try out_file.interface.print("pwd -- print working directory\n", .{});
+
+        try out_file.interface.flush();
+
+        return 0;
+
     } else if (std.mem.eql(u8, base_command, "hack")) {
 
         try exec_hack(init);
@@ -104,9 +120,7 @@ fn exec_green_text(init: std.process.Init) !void {
         }
 
         for (0..1000000) |i| {
-            _ = i;
-
-            try out_file.interface.print("436921874628374698713269847612987346912873468712683473259784612873649817623987461928734698172634987126984716328974612987436987", .{});
+            try out_file.interface.print("436921874628374698713269847612987346912873468712683473259784612873649817623987461928734698172634987126984716328974612987436987{}", .{i});
         }
         try out_file.interface.flush();
     }
@@ -194,8 +208,11 @@ fn exec_hack(init: std.process.Init) !void {
 
         try std.Io.sleep(init.io, .fromMilliseconds(750), .awake);
 
-        try out_file.interface.print("D0ne. t@rget sh0uld b3 w|ped.\n", .{});
+        try out_file.interface.print("D0ne. t@rget sh0uld b3 w1ped.\n", .{});
         try out_file.interface.flush();
+
+    } else if (std.mem.eql(u8, trimmed_result, "4")) {
+
 
     } else {
         try out_file.interface.print("1nval|d opti0n\n", .{});
@@ -209,21 +226,68 @@ pub fn exec_syscommand(cmd: [] []const u8, init: std.process.Init) !void {
     //spawn the child and let it rip (also inherit the standard output/input/err from parent to child so it writed to stdout directly)
     //also catch the error and return it so the program doesnt stop cause try ussualy kills a program from a error
     var child = std.process.spawn(init.io, .{ .argv = cmd, .stdout = .inherit, .stdin = .inherit, .stderr = .inherit}) catch |err| {
-
         std.log.err("{}, tried to run: {s}", .{err, cmd[0]});
+        return;
+    };
+    _ = try child.wait(init.io);
+}
 
+///executes a piped command
+pub fn exec_pipe(cmd: piped_command, init: std.process.Init) !void {
+
+    //run the first command (left side)
+    var left = std.process.spawn(init.io, .{ .argv = cmd.first_command, .stdout = .pipe, .stdin = .inherit, .stderr = .inherit}) catch |err| {
+        std.log.err("{}, left side tried to run: {s}", .{err, cmd.first_command[0]});
         return;
     };
 
-    //now wait for child to finish
-    const wait = try child.wait(init.io);
-    _ = wait;
+    //close the stdout file stream when it finishes
+    defer {
+        if (left.stdout) |stdout| { 
+            stdout.close(init.io);
+        }
+    }
+
+    //read the pipe ret by .stdout and use read_buf as storage
+    var read_buf: [2048]u8 = undefined;
+    //ok so you would acces optional things using ? like this
+    //var out_reader = left.stdout.?.reader(init.io, &read_buf);
+    //but it can be null and it will crash so i will make zig filter the null
+    //non null stdout
+    const non_stdout = left.stdout orelse return;
+    var out_reader = non_stdout.reader(init.io, &read_buf);
+
+    //the entire output
+    var output: [6114]u8 = undefined;
+
+    var count: usize = 0;
+
+    //figure out how much of the buffer was used
+    while (count < output.len) {
+
+        const current = try out_reader.interface.readSliceShort(output[count..]);
+        if (current == 0) {
+            break;
+        }
+        count += 1;
+    }
+
+    std.log.err("output: {s}\n", .{output[0..count]});
+
+    _ = try left.wait(init.io);
+
+    //second command (right side) 123
+//  var right = std.process.spawn(init.io, .{ .argv = cmd.second_command, .stdout = .inherit, .stdin = .pipe, .stderr = .inherit}) catch |err| {
+//      std.log.err("{}, right side tried to run: {s}", .{err, cmd.second_command[0]});
+//      return;
+//  };
+
+//  _ = try right.wait(init.io);
 }
 
 ///functio to tokenize a long string into smaller array of strings to be the base command and args
 ///and if a pipe characted is detected, then run the parse_piped function
 pub fn parse_command(whole_line: []const u8) [] []const u8 {
-
 
     //the string array we are gonna return
     var whole_command: [64][]const u8 = undefined;
@@ -253,12 +317,10 @@ pub fn parse_command(whole_line: []const u8) [] []const u8 {
 pub fn parse_piped(whole_line: []const u8) piped_command {
     //tokenize pipe
 
-    //the string array we are gonna return
+    //result
     var whole_command_separated: [64][]const u8 = undefined;
 
     var count: usize = 0;
-
-    //tok the pipe
     var piper_iterator = std.mem.tokenizeScalar(u8, whole_line, '|');
 
     //and then go to the next occurance of whitespace and tokenize it
@@ -278,15 +340,16 @@ pub fn parse_piped(whole_line: []const u8) piped_command {
 
     var first_command_it = std.mem.tokenizeScalar(u8, whole_command_separated[0], ' ');
 
+    var first_count: usize = 0;
     while (first_command_it.next()) |part| {
 
         //get out when max lenght reached
-        if (count == whole_command_separated[0].len) {
+        if (first_count == whole_command_separated[0].len) {
             break;
         }
 
-        first_cmd[count] = part;
-        count += 1;
+        first_cmd[first_count] = part;
+        first_count += 1;
     }
 
     //THE SECOND COMMAND
@@ -294,21 +357,20 @@ pub fn parse_piped(whole_line: []const u8) piped_command {
 
     var second_command_it = std.mem.tokenizeScalar(u8, whole_command_separated[0], ' ');
 
+    var sec_count: usize = 0;
     while (second_command_it.next()) |part| {
 
         //get out when max lenght reached
-        if (count == whole_command_separated[1].len) {
+        if (sec_count == whole_command_separated[1].len) {
             break;
         }
 
-        second_cmd[count] = part;
-        count += 1;
+        second_cmd[sec_count] = part;
+        sec_count += 1;
     }
 
-    //now return the all one command
     return .{
-        //i dont think this will be a good idea, but ill see when i actually execute the piped command
-        .first_command = &first_cmd,
-        .second_command = &second_cmd,
+        .first_command = first_cmd[0..first_count],
+        .second_command = second_cmd[0..sec_count],
     };
 }
