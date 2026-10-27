@@ -242,47 +242,58 @@ pub fn exec_pipe(cmd: piped_command, init: std.process.Init) !void {
     };
 
     //close the stdout file stream when it finishes
-    defer {
-        if (left.stdout) |stdout| { 
-            stdout.close(init.io);
+    defer  {
+        //deal with null case
+        if (left.stdout) |stdout| {
+            stdout.close(init.io); 
         }
     }
 
     //read the pipe ret by .stdout and use read_buf as storage
-    var read_buf: [2048]u8 = undefined;
+    var left_buf: [6114]u8 = undefined;
     //ok so you would acces optional things using ? like this
     //var out_reader = left.stdout.?.reader(init.io, &read_buf);
     //but it can be null and it will crash so i will make zig filter the null
     //non null stdout
     const non_stdout = left.stdout orelse return;
-    var out_reader = non_stdout.reader(init.io, &read_buf);
-
-    //the entire output
-    var output: [6114]u8 = undefined;
+    var out_reader = non_stdout.reader(init.io, &left_buf);
 
     var count: usize = 0;
-
-    //figure out how much of the buffer was used
-    while (count < output.len) {
-
-        const current = try out_reader.interface.readSliceShort(output[count..]);
+    //put into buffer slice by slice
+    //output.len
+    while (count < left_buf.len) {
+        //current is an usize btw
+        const current = try out_reader.interface.readSliceShort(left_buf[count..]);
         if (current == 0) {
             break;
         }
-        count += 1;
+        count += current;
     }
-
-    std.log.err("output: {s}\n", .{output[0..count]});
 
     _ = try left.wait(init.io);
 
-    //second command (right side) 123
-//  var right = std.process.spawn(init.io, .{ .argv = cmd.second_command, .stdout = .inherit, .stdin = .pipe, .stderr = .inherit}) catch |err| {
-//      std.log.err("{}, right side tried to run: {s}", .{err, cmd.second_command[0]});
-//      return;
-//  };
+    //second command (right side) 
+    var right = std.process.spawn(init.io, .{ .argv = cmd.second_command, .stdout = .inherit, .stdin = .pipe, .stderr = .inherit}) catch |err| {
+        std.log.err("{}, right side tried to run: {s}", .{err, cmd.second_command[0]});
+        return;
+    };
+    defer {
+        //deal with null
+        if (right.stdin) |stdin| {
+            stdin.close(init.io);
+        }
+    }
 
-//  _ = try right.wait(init.io);
+    var right_buf: [6114]u8 = undefined;
+    //non-null
+    const non_stdin = right.stdin orelse return;
+    var in_writed = non_stdin.writer(init.io, &right_buf);
+
+    try in_writed.interface.writeAll(left_buf[0..count]);
+    try in_writed.interface.flush();
+
+
+    _ = try right.wait(init.io);
 }
 
 ///functio to tokenize a long string into smaller array of strings to be the base command and args
